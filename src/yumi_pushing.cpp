@@ -26,6 +26,7 @@ vector<double> right_arm_joint_velocity;
 // function declarations
 vector <double> str2vector(string str, int n_data);
 double limit_joint_velcmd(double cmd, int joint);
+void print_joint_values();
 
 void terminate(int sig){
   flag = 1;
@@ -64,7 +65,8 @@ int main(int argc, char** argv)
   signal(SIGINT, terminate);
   srand (time(NULL));
   std::cout << std::fixed << std::setprecision(2);
-
+  ros::NodeHandle joint_node;
+  ros::Subscriber joint_subscriber = joint_node.subscribe("/yumi/joint_states", 1, joint_state_callback);
   ros::NodeHandle node_handle;
   ros::AsyncSpinner spinner(1);
   ros::NodeHandle param_node;
@@ -96,10 +98,21 @@ int main(int argc, char** argv)
       ROS_ERROR("Error initiliazing right_arm_kdl_wrapper");
   right_arm_kdl_wrapper.ik_solver_vel->setLambda(0.3);
 
+  usleep(1000000);
+  print_joint_values();
+  
+  char user_resp; 
+  cout << "Press any key to continue!" << endl;
+  cin >> user_resp;
+  if (flag)
+    return 0;
+
+  cmd.data = 0;
+  for (int i = 0; i < 7; i++)
+    r_velocity_command_pub[i].publish(cmd);
+
   while(ros::ok())
   {
-    if (flag)
-      break;
     // move the arms to the initial position
     bool all_fine = false;
     while(all_fine == false)
@@ -114,7 +127,15 @@ int main(int argc, char** argv)
           all_fine = false;
       }
       usleep(50000);
+      if (flag)
+      {
+        cmd.data = 0;
+        for (int i = 0; i < 7; i++)
+          r_velocity_command_pub[i].publish(cmd);
+        break;
+      }
     }
+    cout << "joints in intial postiion!" << endl; 
 
     // wait until commands are received
     while(push_cmd_time < 0 && ~flag)
@@ -174,3 +195,15 @@ double limit_joint_velcmd(double cmd, int joint)
     limited_cmd = -JOINT_VELOCITY_LIMIT;
   return limited_cmd;
 }
+
+void print_joint_values()
+{
+  for(int i = 0; i < 7; i++)
+  {
+    if (right_arm_joint_positions(i) >= 0)
+      std::cout << " ";
+    std::cout << right_arm_joint_positions(i) << ", ";
+  }
+  cout << endl;
+}
+
