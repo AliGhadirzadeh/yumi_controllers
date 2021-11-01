@@ -61,6 +61,7 @@ int main(int argc, char** argv)
   KDL::Twist right_arm_cart_velocity;
   KDL::JntArray right_arm_joint_velcmd(7);
   string command_topic;
+  KDL::Frame right_tool_tip_frame;
 
   signal(SIGINT, terminate);
   srand (time(NULL));
@@ -102,14 +103,17 @@ int main(int argc, char** argv)
   print_joint_values();
 
   char user_resp;
-  cout << "Press any key to continue!" << endl;
+  cout << "Press any key to continue (ctrl+c to kill)!" << endl;
   cin >> user_resp;
-  if (flag)
-    return 0;
-
   cmd.data = 0;
   for (int i = 0; i < 7; i++)
     r_velocity_command_pub[i].publish(cmd);
+  if (flag)
+    return 0;
+
+  right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
+  double ee_height_setpoint = right_tool_tip_frame.p(2);
+
 
   while(ros::ok())
   {
@@ -137,7 +141,12 @@ int main(int argc, char** argv)
 
     // wait until commands are received
     while(push_cmd_time < 0)
+    {
       usleep(1000);
+      if (flag)
+        return 0;
+    }
+
     // follow the given commands
     while(ros::ok())
     {
@@ -158,7 +167,9 @@ int main(int argc, char** argv)
           r_velocity_command_pub[i].publish(cmd);
         return 0;
       }
-      right_arm_cart_velocity.vel = KDL::Vector(push_cmd[0], push_cmd[1], 0.0);
+      right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
+      double ee_height_error = ee_height_setpoint - right_tool_tip_frame.p(2);
+      right_arm_cart_velocity.vel = KDL::Vector(push_cmd[0], push_cmd[1], ee_height_error*0.1);
       right_arm_cart_velocity.rot = KDL::Vector(push_cmd[2], 0.0, 0.0);
       right_arm_kdl_wrapper.ik_solver_vel->CartToJnt(right_arm_joint_positions, right_arm_cart_velocity, right_arm_joint_velcmd);
       for(int i = 0; i < 7; i++)
