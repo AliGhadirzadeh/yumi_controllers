@@ -100,8 +100,8 @@ int main(int argc, char** argv)
 
   usleep(1000000);
   print_joint_values();
-  
-  char user_resp; 
+
+  char user_resp;
   cout << "Press any key to continue!" << endl;
   cin >> user_resp;
   if (flag)
@@ -127,24 +127,22 @@ int main(int argc, char** argv)
           all_fine = false;
       }
       usleep(50000);
-      if (flag)
-      {
-        cmd.data = 0;
-        for (int i = 0; i < 7; i++)
-          r_velocity_command_pub[i].publish(cmd);
-        break;
-      }
     }
-    cout << "joints in intial postiion!" << endl; 
+    cout << "joints in intial postiion!" << endl;
+    cmd.data = 0;
+    for (int i = 0; i < 7; i++)
+      r_velocity_command_pub[i].publish(cmd);
+    if (flag)
+      return 0;
 
     // wait until commands are received
-    while(push_cmd_time < 0 && ~flag)
+    while(push_cmd_time < 0)
       usleep(1000);
     // follow the given commands
     while(ros::ok())
     {
       double time_since_last_cmd = ros::Time::now().toSec() - push_cmd_time;
-      if (time_since_last_cmd > cmd_timeout || flag)
+      if (time_since_last_cmd > cmd_timeout)
       {
         cout << "Commands stopped - restarting!" << endl;
         cmd.data = 0;
@@ -154,7 +152,12 @@ int main(int argc, char** argv)
         break;
       }
       if (flag)
-        break;
+      {
+        cmd.data = 0;
+        for(int i = 0; i < 7; i++)
+          r_velocity_command_pub[i].publish(cmd);
+        return 0;
+      }
       right_arm_cart_velocity.vel = KDL::Vector(push_cmd[0], push_cmd[1], 0.0);
       right_arm_cart_velocity.rot = KDL::Vector(push_cmd[2], 0.0, 0.0);
       right_arm_kdl_wrapper.ik_solver_vel->CartToJnt(right_arm_joint_positions, right_arm_cart_velocity, right_arm_joint_velcmd);
@@ -163,11 +166,9 @@ int main(int argc, char** argv)
         cmd.data = right_arm_joint_velcmd(i);
         r_velocity_command_pub[i].publish(cmd);
       }
-      usleep(100000); //wait 100 msec
+      usleep(50000); //wait 50 msec
     }
   }
-  if (flag)
-    cout << "Stop signal received! node is terminating ..." << endl;
   cout << "node terminated successfully" << endl;
   return 0;
 }
@@ -206,4 +207,3 @@ void print_joint_values()
   }
   cout << endl;
 }
-
