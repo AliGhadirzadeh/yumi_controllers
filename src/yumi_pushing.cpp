@@ -45,7 +45,6 @@ void joint_state_callback(const sensor_msgs::JointState & msg)
 void update_traj_callback(const std_msgs::String & msg)
 {
   push_cmd = str2vector(msg.data, 3);
-  cout << push_cmd[0] << ' ' << push_cmd[1] << ' ' << push_cmd[2] << endl;
   push_cmd_time = ros::Time::now().toSec();
 }
 
@@ -65,7 +64,7 @@ int main(int argc, char** argv)
 
   signal(SIGINT, terminate);
   srand (time(NULL));
-  std::cout << std::fixed << std::setprecision(2);
+  std::cout << std::fixed << std::setprecision(3);
   ros::NodeHandle joint_node;
   ros::Subscriber joint_subscriber = joint_node.subscribe("/yumi/joint_states", 1, joint_state_callback);
   ros::NodeHandle node_handle;
@@ -112,15 +111,36 @@ int main(int argc, char** argv)
     return 0;
 
   right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
-  double ee_height_setpoint = right_tool_tip_frame.p(2);
-
+  cout << "x: " <<right_tool_tip_frame.p(0) << ", y:" << right_tool_tip_frame.p(1) << ", z:" << right_tool_tip_frame.p(2) << endl;
+  double ee_height_setpoint = 0.187; //= right_tool_tip_frame.p(2);
+  double ee_x_setpoint = 0.236;
+  double ee_y_setpoint = -0.390;
+  cout << "end effector height: " << ee_height_setpoint << endl;
 
   while(ros::ok())
   {
     // move the arms to the initial position
     bool all_fine = false;
+    all_fine = false;
     while(all_fine == false)
     {
+      right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
+      if (right_tool_tip_frame.p(2) < (ee_height_setpoint-0.01))
+      {
+        while (right_tool_tip_frame.p(2) < (ee_height_setpoint+0.005))
+        {
+	  right_arm_cart_velocity.vel = KDL::Vector(0.0, 0.0, 0.01);
+          right_arm_cart_velocity.rot = KDL::Vector(0.0, 0.0, 0.0);
+          right_arm_kdl_wrapper.ik_solver_vel->CartToJnt(right_arm_joint_positions, right_arm_cart_velocity, right_arm_joint_velcmd);
+          for(int i = 0; i < 7; i++)
+          {
+            cmd.data = right_arm_joint_velcmd(i);
+            r_velocity_command_pub[i].publish(cmd);
+          }
+          usleep(50000); //wait 50 msec
+          right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
+        }
+      }
       all_fine = true;
       for (int i = 0; i < 7; i++)
       {
@@ -169,8 +189,9 @@ int main(int argc, char** argv)
       }
       right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
       double ee_height_error = ee_height_setpoint - right_tool_tip_frame.p(2);
-      right_arm_cart_velocity.vel = KDL::Vector(push_cmd[0], push_cmd[1], ee_height_error*0.1);
-      right_arm_cart_velocity.rot = KDL::Vector(push_cmd[2], 0.0, 0.0);
+      cout << ee_height_setpoint << endl;
+      right_arm_cart_velocity.vel = KDL::Vector(push_cmd[0], push_cmd[1], ee_height_error*1.0);
+      right_arm_cart_velocity.rot = KDL::Vector(0.0, 0.0, push_cmd[2]);
       right_arm_kdl_wrapper.ik_solver_vel->CartToJnt(right_arm_joint_positions, right_arm_cart_velocity, right_arm_joint_velcmd);
       for(int i = 0; i < 7; i++)
       {
