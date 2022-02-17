@@ -88,7 +88,7 @@ int main(int argc, char** argv)
   double cmd_timeout = 0.5;
   param_node.getParam("/command_timeout", cmd_timeout);
   vector<double> r_init_joint_position;
-  param_node.getParam("/initial_joint_position/right_arm0", r_init_joint_position);
+  param_node.getParam("/initial_joint_position/right_arm", r_init_joint_position);
 
   if(!right_arm_kdl_wrapper.init("yumi_body", "yumi_link_7_r"))
       ROS_ERROR("Error initiliazing right_arm_kdl_wrapper");
@@ -136,6 +136,7 @@ int main(int argc, char** argv)
           right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
         }
       }
+
       all_fine = true;
       for (int i = 0; i < 7; i++)
       {
@@ -145,16 +146,18 @@ int main(int argc, char** argv)
         if(abs(r_init_joint_position[i]-right_arm_joint_positions(i))>0.02)
           all_fine = false;
       }
+    }
       usleep(50000);
       right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
-      double ee_x_setpoint = right_tool_tip_frame.p(0);
+      double ee_x_setpoint = right_tool_tip_frame.p(0) + 0.1;
       double ee_y_setpoint = right_tool_tip_frame.p(1) + 0.1;
+
       all_fine = false;
       while (all_fine == false)
       {
-        double vx = 0.1*(ee_x_setpoint - right_tool_tip_frame.p(0))
-        double vy = 0.1*(ee_y_setpoint - right_tool_tip_frame.p(1))
-        double vz = 0.1*(ee_height_setpoint - right_tool_tip_frame.p(2))
+        double vx = 1.0*(ee_x_setpoint - right_tool_tip_frame.p(0));
+        double vy = 1.0*(ee_y_setpoint - right_tool_tip_frame.p(1));
+        double vz = 1.0*(ee_height_setpoint - right_tool_tip_frame.p(2));
         right_arm_cart_velocity.vel = KDL::Vector(vx, vy, vz);
         right_arm_cart_velocity.rot = KDL::Vector(0.0, 0.0, 0.0);
         right_arm_kdl_wrapper.ik_solver_vel->CartToJnt(right_arm_joint_positions, right_arm_cart_velocity, right_arm_joint_velcmd);
@@ -165,9 +168,9 @@ int main(int argc, char** argv)
         }
         usleep(50000); //wait 50 msec
         right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
-        if (abs(vx) < 0.01 && abs(vy < 0.01) && abs(vz) < 0.01)
-          all_fine = True;
-      }
+        if (abs(vx) < 0.001 && abs(vy < 0.001) && abs(vz) < 0.001)
+          all_fine = true;
+      
     }
     cout << "joints in intial postiion!" << endl;
     cmd.data = 0;
