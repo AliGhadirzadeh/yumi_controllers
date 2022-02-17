@@ -33,6 +33,8 @@ find_library(KDL_LIBRARY REQUIRED NAMES orocos-kdl HINTS ${orocos_kdl_LIBRARY_DI
 add_executable(kdl_controller src/kdl_controller.cpp)
 add_executable(circlerun_pad_controller src/circlerun_pad_controller.cpp)
 add_executable(yumi_pushing src/yumi_pushing.cpp)
+add_executable(goto_init_jpose src/goto_init_jpose.cpp)
 target_link_libraries(kdl_controller  ${catkin_LIBRARIES} )
 target_link_libraries(circlerun_pad_controller  ${catkin_LIBRARIES} )
 target_link_libraries(yumi_pushing  ${catkin_LIBRARIES} )
+target_link_libraries(goto_init_jpose  ${catkin_LIBRARIES} )

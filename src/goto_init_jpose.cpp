@@ -10,6 +10,7 @@
 #include <fstream>
 #include <signal.h>
 #include <boost/lexical_cast.hpp>
+#include <kdl_wrapper/kdl_wrapper.h>
 
 using namespace std;
 #define JOINT_VELOCITY_LIMIT 0.05
@@ -51,7 +52,7 @@ int main(int argc, char** argv)
   right_arm_joint_velocity.resize(7);
   left_arm_joint_positions.resize(7);
   left_arm_joint_velocity.resize(7);
-
+  string command_topic;
   std_msgs::Float64 cmd;
 
   signal(SIGINT, terminate);
@@ -125,6 +126,7 @@ int main(int argc, char** argv)
     r_velocity_command_pub[i].publish(cmd);
     l_velocity_command_pub[i].publish(cmd);
   }
+  usleep(1000000);
   cout << "node terminated successfully" << endl;
   return 0;
 }
