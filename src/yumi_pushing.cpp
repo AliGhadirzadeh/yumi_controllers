@@ -87,12 +87,8 @@ int main(int argc, char** argv)
   // ros parameters
   double cmd_timeout = 0.5;
   param_node.getParam("/command_timeout", cmd_timeout);
-  vector<vector<double> > r_init_joint_position;
-  vector<double> vect;
-  param_node.getParam("/initial_joint_position/right_arm0", vect);
-  r_init_joint_position.push_back(vect);
-  param_node.getParam("/initial_joint_position/right_arm1", vect);
-  r_init_joint_position.push_back(vect);
+  vector<double> r_init_joint_position;
+  param_node.getParam("/initial_joint_position/right_arm0", r_init_joint_position);
 
   if(!right_arm_kdl_wrapper.init("yumi_body", "yumi_link_7_r"))
       ROS_ERROR("Error initiliazing right_arm_kdl_wrapper");
@@ -113,8 +109,7 @@ int main(int argc, char** argv)
   right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
   cout << "x: " <<right_tool_tip_frame.p(0) << ", y:" << right_tool_tip_frame.p(1) << ", z:" << right_tool_tip_frame.p(2) << endl;
   double ee_height_setpoint = 0.187; //= right_tool_tip_frame.p(2);
-  double ee_x_setpoint = 0.236;
-  double ee_y_setpoint = -0.390;
+
   cout << "end effector height: " << ee_height_setpoint << endl;
 
   while(ros::ok())
@@ -129,7 +124,7 @@ int main(int argc, char** argv)
       {
         while (right_tool_tip_frame.p(2) < (ee_height_setpoint+0.005))
         {
-	  right_arm_cart_velocity.vel = KDL::Vector(0.0, 0.0, 0.01);
+	        right_arm_cart_velocity.vel = KDL::Vector(0.0, 0.0, 0.01);
           right_arm_cart_velocity.rot = KDL::Vector(0.0, 0.0, 0.0);
           right_arm_kdl_wrapper.ik_solver_vel->CartToJnt(right_arm_joint_positions, right_arm_cart_velocity, right_arm_joint_velcmd);
           for(int i = 0; i < 7; i++)
@@ -144,13 +139,35 @@ int main(int argc, char** argv)
       all_fine = true;
       for (int i = 0; i < 7; i++)
       {
-        cmd.data = 0.3*(r_init_joint_position[0][i]-right_arm_joint_positions(i));
+        cmd.data = 0.3*(r_init_joint_position[i]-right_arm_joint_positions(i));
         cmd.data = limit_joint_velcmd(cmd.data, i);
         r_velocity_command_pub[i].publish(cmd);
-        if(abs(r_init_joint_position[0][i]-right_arm_joint_positions(i))>0.02)
+        if(abs(r_init_joint_position[i]-right_arm_joint_positions(i))>0.02)
           all_fine = false;
       }
       usleep(50000);
+      right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
+      double ee_x_setpoint = right_tool_tip_frame.p(0);
+      double ee_y_setpoint = right_tool_tip_frame.p(1) + 0.1;
+      all_fine = false;
+      while (all_fine == false)
+      {
+        double vx = 0.1*(ee_x_setpoint - right_tool_tip_frame.p(0))
+        double vy = 0.1*(ee_y_setpoint - right_tool_tip_frame.p(1))
+        double vz = 0.1*(ee_height_setpoint - right_tool_tip_frame.p(2))
+        right_arm_cart_velocity.vel = KDL::Vector(vx, vy, vz);
+        right_arm_cart_velocity.rot = KDL::Vector(0.0, 0.0, 0.0);
+        right_arm_kdl_wrapper.ik_solver_vel->CartToJnt(right_arm_joint_positions, right_arm_cart_velocity, right_arm_joint_velcmd);
+        for(int i = 0; i < 7; i++)
+        {
+          cmd.data = right_arm_joint_velcmd(i);
+          r_velocity_command_pub[i].publish(cmd);
+        }
+        usleep(50000); //wait 50 msec
+        right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
+        if (abs(vx) < 0.01 && abs(vy < 0.01) && abs(vz) < 0.01)
+          all_fine = True;
+      }
     }
     cout << "joints in intial postiion!" << endl;
     cmd.data = 0;
