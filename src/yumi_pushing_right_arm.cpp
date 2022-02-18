@@ -50,7 +50,7 @@ void update_traj_callback(const std_msgs::String & msg)
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "yumi_pushing_node");
+  ros::init(argc, argv, "yumi_pushing_right_arm_node");
 
   right_arm_joint_positions.resize(7);
   right_arm_joint_velocity.resize(7);
