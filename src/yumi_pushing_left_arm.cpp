@@ -120,7 +120,7 @@ int main(int argc, char** argv)
     while(all_fine == false)
     {
       right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
-      if (right_tool_tip_frame.p(2) < (ee_height_setpoint-0.01))
+      if (right_tool_tip_frame.p(2) < (ee_height_setpoint-0.05))
       {
         while (right_tool_tip_frame.p(2) < (ee_height_setpoint+0.005))
         {
@@ -149,8 +149,8 @@ int main(int argc, char** argv)
     cout << "joints in intial postiion!" << endl;
     usleep(2000000);
     right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
-    double ee_x_setpoint = right_tool_tip_frame.p(0) + 0.1;
-    double ee_y_setpoint = right_tool_tip_frame.p(1) + 0.1;
+    double ee_x_setpoint = right_tool_tip_frame.p(0) + 0.0;
+    double ee_y_setpoint = right_tool_tip_frame.p(1) + 0.0;
     all_fine = false;
     while (all_fine == false)
     {
