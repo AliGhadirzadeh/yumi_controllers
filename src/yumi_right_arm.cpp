@@ -15,10 +15,11 @@
 
 using namespace std;
 #define JOINT_VELOCITY_LIMIT 0.05
+#define DIM_ACTION 7
 
 // global variables
-vector<double> push_cmd;
-double push_cmd_time = -1;
+vector<double> action;
+double action_time = -1;
 volatile sig_atomic_t flag = 0;
 KDL::JntArray right_arm_joint_positions;
 vector<double> right_arm_joint_velocity;
@@ -44,17 +45,17 @@ void joint_state_callback(const sensor_msgs::JointState & msg)
 
 void update_traj_callback(const std_msgs::String & msg)
 {
-  push_cmd = str2vector(msg.data, 3);
-  push_cmd_time = ros::Time::now().toSec();
+  action = str2vector(msg.data, DIM_ACTION);
+  action_time = ros::Time::now().toSec();
 }
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "yumi_pushing_right_arm_node");
+  ros::init(argc, argv, "yumi_right_arm_node");
 
   right_arm_joint_positions.resize(7);
   right_arm_joint_velocity.resize(7);
-  push_cmd.resize(3);
+  action.resize(DIM_ACTION);
   std_msgs::Float64 cmd;
   KDLWrapper right_arm_kdl_wrapper;
   KDL::Twist right_arm_cart_velocity;
@@ -108,13 +109,12 @@ int main(int argc, char** argv)
 
   right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
   cout << "x: " <<right_tool_tip_frame.p(0) << ", y:" << right_tool_tip_frame.p(1) << ", z:" << right_tool_tip_frame.p(2) << endl;
-  double ee_height_setpoint = 0.187; //= right_tool_tip_frame.p(2);
 
-  cout << "end effector height: " << ee_height_setpoint << endl;
+  double ee_height_setpoint = 0.187;
 
+  // move the arms to the initial position
   while(ros::ok())
-  {
-    // move the arms to the initial position
+  {  
     bool all_fine = false;
     all_fine = false;
     while(all_fine == false)
@@ -147,7 +147,8 @@ int main(int argc, char** argv)
       }
     }
     cout << "joints in intial postiion!" << endl;
-    usleep(2000000);
+    usleep(1000000);
+    // randomly moving the arm
     right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
     double ee_x_setpoint = right_tool_tip_frame.p(0) + ((rand()/(RAND_MAX+1.0))-0.5)/10;
     double ee_y_setpoint = right_tool_tip_frame.p(1) + ((rand()/(RAND_MAX+1.0))-0.5)/10;
@@ -178,7 +179,7 @@ int main(int argc, char** argv)
       return 0;
 
     // wait until commands are received
-    while(push_cmd_time < 0)
+    while(action_time < 0)
     {
       usleep(1000);
       if (flag)
@@ -188,14 +189,14 @@ int main(int argc, char** argv)
     // follow the given commands
     while(ros::ok())
     {
-      double time_since_last_cmd = ros::Time::now().toSec() - push_cmd_time;
+      double time_since_last_cmd = ros::Time::now().toSec() - action_time;
       if (time_since_last_cmd > cmd_timeout)
       {
         cout << "Commands stopped - restarting!" << endl;
         cmd.data = 0;
         for(int i = 0; i < 7; i++)
           r_velocity_command_pub[i].publish(cmd);
-        push_cmd_time = -1;
+        action_time = -1;
         break;
       }
       if (flag)
@@ -208,8 +209,8 @@ int main(int argc, char** argv)
       right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
       double ee_height_error = ee_height_setpoint - right_tool_tip_frame.p(2);
       cout << ee_height_setpoint << endl;
-      right_arm_cart_velocity.vel = KDL::Vector(push_cmd[0], push_cmd[1], ee_height_error*1.0);
-      right_arm_cart_velocity.rot = KDL::Vector(0.0, 0.0, push_cmd[2]);
+      right_arm_cart_velocity.vel = KDL::Vector(action[0], action[1], action[2]);
+      right_arm_cart_velocity.rot = KDL::Vector(action[3], action[4], action[5]);
       right_arm_kdl_wrapper.ik_solver_vel->CartToJnt(right_arm_joint_positions, right_arm_cart_velocity, right_arm_joint_velcmd);
       for(int i = 0; i < 7; i++)
       {

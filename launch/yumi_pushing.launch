@@ -1,0 +1,9 @@
+<launch>
+
+<!-- adding parameters -->
+<rosparam param="/initial_joint_position/right_arm" >[1.65, -1.74, -1.59,  0.7, -2.75,  1.76,  1.11]</rosparam>
+<rosparam param="/initial_joint_position/left_arm" >[-1.65, -1.74,  1.59,  0.7,  2.75,  1.76, -1.11]</rosparam>
+
+<rosparam param="/command_timeout" > 0.5 </rosparam>
+
+</launch>

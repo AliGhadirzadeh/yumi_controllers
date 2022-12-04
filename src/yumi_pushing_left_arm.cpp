@@ -120,9 +120,9 @@ int main(int argc, char** argv)
     while(all_fine == false)
     {
       left_arm_kdl_wrapper.fk_solver_pos->JntToCart(left_arm_joint_positions, left_tool_tip_frame, -1);
-      if (left_tool_tip_frame.p(2) < (ee_height_setpoint-0.05))
+      if (left_tool_tip_frame.p(2) < (ee_height_setpoint-0.02))
       {
-        while (left_tool_tip_frame.p(2) < (ee_height_setpoint+0.005))
+        while (left_tool_tip_frame.p(2) < (ee_height_setpoint-0.005))
         {
 	        left_arm_cart_velocity.vel = KDL::Vector(0.0, 0.0, 0.01);
           left_arm_cart_velocity.rot = KDL::Vector(0.0, 0.0, 0.0);
@@ -149,8 +149,8 @@ int main(int argc, char** argv)
     cout << "joints in intial postiion!" << endl;
     usleep(2000000);
     left_arm_kdl_wrapper.fk_solver_pos->JntToCart(left_arm_joint_positions, left_tool_tip_frame, -1);
-    double ee_x_setpoint = left_tool_tip_frame.p(0) + 0.0;
-    double ee_y_setpoint = left_tool_tip_frame.p(1) + 0.0;
+    double ee_x_setpoint = left_tool_tip_frame.p(0) + ((rand()/(RAND_MAX+1.0))-0.5)/10;
+    double ee_y_setpoint = left_tool_tip_frame.p(1) + ((rand()/(RAND_MAX+1.0))-0.5)/10;
     all_fine = false;
     while (all_fine == false)
     {
