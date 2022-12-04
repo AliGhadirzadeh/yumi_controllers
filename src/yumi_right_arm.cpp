@@ -16,6 +16,8 @@
 using namespace std;
 #define JOINT_VELOCITY_LIMIT 0.05
 #define DIM_ACTION 7
+#define NUM_JOINTS 7
+#define EE_Z_LOW_THRESHOLD 0.05
 
 // global variables
 vector<double> action;
@@ -53,13 +55,13 @@ int main(int argc, char** argv)
 {
   ros::init(argc, argv, "yumi_right_arm_node");
 
-  right_arm_joint_positions.resize(7);
-  right_arm_joint_velocity.resize(7);
+  right_arm_joint_positions.resize(NUM_JOINTS);
+  right_arm_joint_velocity.resize(NUM_JOINTS);
   action.resize(DIM_ACTION);
   std_msgs::Float64 cmd;
   KDLWrapper right_arm_kdl_wrapper;
   KDL::Twist right_arm_cart_velocity;
-  KDL::JntArray right_arm_joint_velcmd(7);
+  KDL::JntArray right_arm_joint_velcmd(NUM_JOINTS);
   string command_topic;
   KDL::Frame right_tool_tip_frame;
 
@@ -71,10 +73,10 @@ int main(int argc, char** argv)
   ros::NodeHandle node_handle;
   ros::AsyncSpinner spinner(1);
   ros::NodeHandle param_node;
-  vector<ros::NodeHandle> r_velocity_command_node(7);
-  vector<ros::Publisher> r_velocity_command_pub(7);
-  int urdf_order[7] = {1,2,7,3,4,5,6};
-  for(int i = 0; i < 7; i++)
+  vector<ros::NodeHandle> r_velocity_command_node(NUM_JOINTS);
+  vector<ros::Publisher> r_velocity_command_pub(NUM_JOINTS);
+  int urdf_order[NUM_JOINTS] = {1,2,7,3,4,5,6};
+  for(int i = 0; i < NUM_JOINTS; i++)
   {
     command_topic = "yumi/joint_vel_controller_" + to_string(urdf_order[i]) + "_r/command";
     r_velocity_command_pub[i] = r_velocity_command_node[i].advertise<std_msgs::Float64>(command_topic.c_str(), 10);
@@ -83,10 +85,11 @@ int main(int argc, char** argv)
   ros::Subscriber cmd_subscriber = cmd_node.subscribe("/socket_string_msg", 10000, update_traj_callback);
 
   spinner.start();
-  cout << "yumi_pushing_node started" << endl;
+  cout << "yumi_right_arm_node started" << endl;
 
   // ros parameters
-  double cmd_timeout = 0.5;
+  double cmd_timeout = 5; // 5 secs until reset
+  double action_duration = 0.3 // 300 msecs to execut the velocity action
   param_node.getParam("/command_timeout", cmd_timeout);
   vector<double> r_init_joint_position;
   param_node.getParam("/initial_joint_position/right_arm", r_init_joint_position);
@@ -108,21 +111,19 @@ int main(int argc, char** argv)
     return 0;
 
   right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
-  cout << "x: " <<right_tool_tip_frame.p(0) << ", y:" << right_tool_tip_frame.p(1) << ", z:" << right_tool_tip_frame.p(2) << endl;
-
-  double ee_height_setpoint = 0.187;
+  cout << "x: " << right_tool_tip_frame.p(0) << ", y:" << right_tool_tip_frame.p(1) << ", z:" << right_tool_tip_frame.p(2) << endl;
 
   // move the arms to the initial position
   while(ros::ok())
-  {  
+  {
     bool all_fine = false;
     all_fine = false;
     while(all_fine == false)
     {
       right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
-      if (right_tool_tip_frame.p(2) < (ee_height_setpoint-0.02))
+      if (right_tool_tip_frame.p(2) < (EE_Z_LOW_THRESHOLD+0.04))
       {
-        while (right_tool_tip_frame.p(2) < (ee_height_setpoint-0.005))
+        while (right_tool_tip_frame.p(2) < (EE_Z_LOW_THRESHOLD+0.08))
         {
 	        right_arm_cart_velocity.vel = KDL::Vector(0.0, 0.0, 0.01);
           right_arm_cart_velocity.rot = KDL::Vector(0.0, 0.0, 0.0);
@@ -157,7 +158,7 @@ int main(int argc, char** argv)
     {
       double vx = 1.0*(ee_x_setpoint - right_tool_tip_frame.p(0));
       double vy = 1.0*(ee_y_setpoint - right_tool_tip_frame.p(1));
-      double vz = 1.0*(ee_height_setpoint - right_tool_tip_frame.p(2));
+      double vz = 1.0*(EE_Z_LOW_THRESHOLD + 0.05 - right_tool_tip_frame.p(2));
       right_arm_cart_velocity.vel = KDL::Vector(vx, vy, vz);
       right_arm_cart_velocity.rot = KDL::Vector(0.0, 0.0, 0.0);
       right_arm_kdl_wrapper.ik_solver_vel->CartToJnt(right_arm_joint_positions, right_arm_cart_velocity, right_arm_joint_velcmd);
@@ -194,7 +195,7 @@ int main(int argc, char** argv)
       {
         cout << "Commands stopped - restarting!" << endl;
         cmd.data = 0;
-        for(int i = 0; i < 7; i++)
+        for(int i = 0; i < NUM_JOINTS; i++)
           r_velocity_command_pub[i].publish(cmd);
         action_time = -1;
         break;
@@ -202,22 +203,29 @@ int main(int argc, char** argv)
       if (flag)
       {
         cmd.data = 0;
-        for(int i = 0; i < 7; i++)
+        for(int i = 0; i < NUM_JOINTS; i++)
           r_velocity_command_pub[i].publish(cmd);
         return 0;
       }
-      right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
-      double ee_height_error = ee_height_setpoint - right_tool_tip_frame.p(2);
-      cout << ee_height_setpoint << endl;
-      right_arm_cart_velocity.vel = KDL::Vector(action[0], action[1], action[2]);
-      right_arm_cart_velocity.rot = KDL::Vector(action[3], action[4], action[5]);
-      right_arm_kdl_wrapper.ik_solver_vel->CartToJnt(right_arm_joint_positions, right_arm_cart_velocity, right_arm_joint_velcmd);
-      for(int i = 0; i < 7; i++)
+      if (time_since_last_cmd > action_duration)
       {
-        cmd.data = right_arm_joint_velcmd(i);
-        r_velocity_command_pub[i].publish(cmd);
+        cmd.data = 0;
+        for(int i = 0; i < NUM_JOINTS; i++)
+          r_velocity_command_pub[i].publish(cmd);
       }
-      usleep(50000); //wait 50 msec
+      else
+      {
+        right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
+        right_arm_cart_velocity.vel = KDL::Vector(action[0], action[1], action[2]);
+        right_arm_cart_velocity.rot = KDL::Vector(action[3], action[4], action[5]);
+        right_arm_kdl_wrapper.ik_solver_vel->CartToJnt(right_arm_joint_positions, right_arm_cart_velocity, right_arm_joint_velcmd);
+        for(int i = 0; i < NUM_JOINTS; i++)
+        {
+          cmd.data = right_arm_joint_velcmd(i);
+          r_velocity_command_pub[i].publish(cmd);
+        }
+      }
+      usleep(10000); //wait 10 msec
     }
   }
   cout << "node terminated successfully" << endl;
