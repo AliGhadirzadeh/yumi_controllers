@@ -144,11 +144,20 @@ double limit_joint_velcmd(double cmd, int joint)
 
 void print_joint_values()
 {
+  cout << "right arm:" << endl;
   for(int i = 0; i < 7; i++)
   {
     if (right_arm_joint_positions(i) >= 0)
       std::cout << " ";
     std::cout << right_arm_joint_positions(i) << ", ";
+  }
+  cout << endl;
+  cout << "left arm:" << endl;
+  for(int i = 0; i < 7; i++)
+  {
+    if (left_arm_joint_positions(i) >= 0)
+      std::cout << " ";
+    std::cout << left_arm_joint_positions(i) << ", ";
   }
   cout << endl;
 }
