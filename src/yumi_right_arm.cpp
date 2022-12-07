@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <boost/lexical_cast.hpp>
 #include <kdl_wrapper/kdl_wrapper.h>
+#include <std_msgs/String.h>
 
 using namespace std;
 #define JOINT_VELOCITY_LIMIT 0.05
@@ -147,6 +148,16 @@ int main(int argc, char** argv)
     l_velocity_command_pub[i].publish(cmd);
   }
 
+  /************************* socket commands *************************/
+  // wait until commands are received
+  while(action_cmd_time < 0)
+  {
+    usleep(1000);
+    if (flag)
+      return 0;
+  }
+  cout << "socket commands received" << endl;
+
   /************************* cart control *************************/
   KDLWrapper right_arm_kdl_wrapper;
   KDL::Twist right_arm_cart_velocity;
@@ -162,31 +173,33 @@ int main(int argc, char** argv)
   right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
   cout << "x: " <<right_tool_tip_frame.p(0) << ", y:" << right_tool_tip_frame.p(1) << ", z:" << right_tool_tip_frame.p(2) << endl;
 
-  double target = right_tool_tip_frame.p(0) + 0.1;  
-  double vel = 0.01;
 
   while(~flag)
   {
-    right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
-
-    if (vel > 0 && right_tool_tip_frame.p(0) > target)
+    double time_since_last_cmd = ros::Time::now().toSec() - action_cmd_time;
+    if (time_since_last_cmd > 0.5)
     {
-	vel = -0.01;
-	target -= 0.1;
+      cmd.data = 0; 
+      for(int i = 0; i < 7; i++)
+        r_velocity_command_pub[i].publish(cmd);
+      if (time_since_last_cmd > 5.0)
+      {
+        cout << "Commands stopped - terminating!" << endl;
+        break;
+      }
     }
-    if (vel < 0 && right_tool_tip_frame.p(0) < target)
+    else
     {
-	vel = 0.01;
-	target += 0.1;
-    }
-  
-    right_arm_cart_velocity.vel = KDL::Vector(vel, 0.0, 0.0);
-    right_arm_cart_velocity.rot = KDL::Vector(0.0, 0.0, 0.0);
-    right_arm_kdl_wrapper.ik_solver_vel->CartToJnt(right_arm_joint_positions, right_arm_cart_velocity, right_arm_joint_velcmd);
-    for(int i = 0; i < 7; i++)
-    {
-      cmd.data = right_arm_joint_velcmd(i);
-      r_velocity_command_pub[i].publish(cmd);
+		  right_arm_kdl_wrapper.fk_solver_pos->JntToCart(right_arm_joint_positions, right_tool_tip_frame, -1);
+		  
+		  right_arm_cart_velocity.vel = KDL::Vector(action_cmd[0], action_cmd[1], action_cmd[2]);
+		  right_arm_cart_velocity.rot = KDL::Vector(0.0, 0.0, 0.0);
+		  right_arm_kdl_wrapper.ik_solver_vel->CartToJnt(right_arm_joint_positions, right_arm_cart_velocity, right_arm_joint_velcmd);
+		  for(int i = 0; i < 7; i++)
+		  {
+		    cmd.data = right_arm_joint_velcmd(i);
+		    r_velocity_command_pub[i].publish(cmd);
+		  }
     }
     usleep(50000); //wait 50 msec
   }
@@ -204,6 +217,7 @@ int main(int argc, char** argv)
 
 vector <double> str2vector(string str, int n_data)
 {
+  cout << "command: " << str << endl;
   vector<double> data;
   for (int j = 0; j < n_data; j++)
   {
